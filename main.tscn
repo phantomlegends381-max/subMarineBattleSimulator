@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://c5730j0axkjyy"]
+
+[node name="Main" type="Node2D" unique_id=1414915404]
+
+[node name="StatusIndicator" type="StatusIndicator" parent="." unique_id=993999536]
+
+[node name="Parallax2D" type="Parallax2D" parent="." unique_id=1987986144]
+
+[node name="Sprite2D" type="Sprite2D" parent="Parallax2D" unique_id=1332142340]
