@@ -2,7 +2,7 @@ extends CharacterBody2D
 
 const SPEED = 300
 @onready var sprite = $Sprite2D
-@onready var bullet_spawn = $BulletSpawn
+@onready var bullet_spawn = $bullet_spawn
 var bullet_scene: PackedScene = preload("res://Bullet.tscn")
 
 func _physics_process(delta):
@@ -24,10 +24,10 @@ func _physics_process(delta):
 	
 	# Flip ship and bullet spawn point
 	if direction.x > 0:
-		sprite.flip_h = false
+		sprite.flip_h = true
 		bullet_spawn.position.x = abs(bullet_spawn.position.x)  # front
 	elif direction.x < 0:
-		sprite.flip_h = true
+		sprite.flip_h = false
 		bullet_spawn.position.x = -abs(bullet_spawn.position.x) # front when flipped
 	
 	# Shoot bullets
@@ -39,9 +39,6 @@ func shoot():
 	bullet.global_position = bullet_spawn.global_position
 	
 	# Shoot in facing direction
-	if sprite.flip_h:
-		bullet.direction = Vector2.RIGHT
-	else:
-		bullet.direction = Vector2.LEFT
+	
 	
 	get_tree().current_scene.add_child(bullet)
