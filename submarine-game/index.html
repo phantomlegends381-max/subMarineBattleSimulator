@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submarine Evolution: Deep Sea</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: white; }
+        canvas { display: block; image-rendering: pixelated; background: #000b1a; }
+        #ui { position: absolute; top: 10px; left: 10px; pointer-events: none; }
+        .hb-container { width: 200px; height: 20px; background: #333; border: 2px solid #fff; margin-bottom: 5px; transition: width 0.3s; }
+        #hp-bar { width: 100%; height: 100%; background: #00ff00; transition: width 0.2s; }
+        #stats { font-size: 18px; text-shadow: 2px 2px #000; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        HULL INTEGRITY
+        <div id="hp-cont" class="hb-container"><div id="hp-bar"></div></div>
+        <div id="stats">
+            SCORE: <span id="score">0</span><br>
+            EVO LEVEL: <span id="lvl">1</span><br>
+            DEPTH: <span id="depth">0</span>m
+        </div>
+    </div>
+    <canvas id="g"></canvas>
+
+<script>
+const canvas = document.getElementById("g");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// 1. ASSET LOADING
+const imgPaths = { 
+    sub: 'submarine.png', 
+    shark: 'shark.png', 
+    starfish: 'starfish.png', 
+    bg: 'bg.png', 
+    octopus: 'octopus.png' 
+};
+const s = {};
+let loaded = 0;
+
+for (let k in imgPaths) {
+    s[k] = new Image();
+    s[k].src = imgPaths[k];
+    s[k].onload = () => { if(++loaded === 5) start(); };
+}
+
+// 2. GAME STATE
+let p = { x: 800, y: 300, w: 120, h: 60, hp: 100, scale: 1 };
+let enemies = [];
+let bullets = [];
+let score = 0;
+let growthFactor = 1.0; 
+let depth = 0;
+let keys = {};
+let scroll = 0;
+
+window.onkeydown = e => keys[e.code] = true;
+window.onkeyup = e => keys[e.code] = false;
+
+function start() { requestAnimationFrame(loop); }
+
+function evolve() {
+    p.scale += 0.03; // Sub grows 3%
+    growthFactor += 0.02; // Sharks grow 2%
+    
+    // Grow UI bar
+    document.getElementById("hp-cont").style.width = (200 * p.scale) + "px";
+    document.getElementById("lvl").innerText = Math.floor((p.scale - 1) * 33) + 1;
+}
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    scroll += 2;
+
+    // --- DRAW BACKGROUND ---
+    ctx.drawImage(s.bg, -(scroll % canvas.width), 0, canvas.width, canvas.height);
+    ctx.drawImage(s.bg, -(scroll % canvas.width) + canvas.width, 0, canvas.width, canvas.height);
+
+    // --- PLAYER MOVEMENT ---
+    if (keys["ArrowUp"]) p.y -= 6;
+    if (keys["ArrowDown"]) p.y += 6;
+    if (keys["ArrowLeft"]) p.x -= 6;
+    if (keys["ArrowRight"]) p.x += 6;
+
+    // --- DRAW SUBMARINE (Facing Right) ---
+    ctx.drawImage(s.sub, p.x, p.y, p.w * p.scale, p.h * p.scale);
+
+    // --- SHOOTING (Fires Left) ---
+    if (keys["Space"]) {
+        if (bullets.length < 6) {
+            bullets.push({
+                x: p.x, 
+                y: p.y + (p.h * p.scale) / 2, 
+                w: 25 * p.scale, 
+                h: 25 * p.scale
+            });
+            keys["Space"] = false;
+        }
+    }
+
+    // --- BULLET LOGIC ---
+    bullets.forEach((b, i) => {
+        b.x -= 12; // Torpedoes fly left
+        ctx.drawImage(s.starfish, b.x, b.y, b.w, b.h);
+        if (b.x < -50) bullets.splice(i, 1);
+    });
+
+    // --- ENEMY SPAWNING ---
+    if (Math.random() < 0.02) {
+        enemies.push({
+            x: -150, 
+            y: Math.random() * (canvas.height - 100), 
+            w: 90 * growthFactor, 
+            h: 45 * growthFactor, 
+            hp: 30 * growthFactor, 
+            maxHp: 30 * growthFactor
+        });
+    }
+
+    // --- ENEMY LOGIC & DRAWING ---
+    enemies.forEach((en, i) => {
+        en.x += 3.5; // Sharks swim right toward the sub
+
+        // FLIP SHARK ONLY:
+        ctx.save();
+        ctx.translate(en.x + en.w/2, en.y + en.h/2);
+        ctx.scale(-1, 1); // Flips shark horizontally
+        ctx.drawImage(s.shark, -en.w/2, -en.h/2, en.w, en.h);
+        ctx.restore();
+
+        // Individual Shark Health Bar
+        ctx.fillStyle = "red";
+        ctx.fillRect(en.x, en.y - 10, en.w, 5);
+        ctx.fillStyle = "#00ff00";
+        ctx.fillRect(en.x, en.y - 10, (en.hp / en.maxHp) * en.w, 5);
+
+        // Collision: Bullets vs Shark
+        bullets.forEach((b, bi) => {
+            if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                en.hp -= 10;
+                bullets.splice(bi, 1);
+                if (en.hp <= 0) {
+                    enemies.splice(i, 1);
+                    score += 150;
+                    evolve(); 
+                }
+            }
+        });
+
+        // Collision: Shark vs Submarine
+        let pW = p.w * p.scale;
+        let pH = p.h * p.scale;
+        if (p.x < en.x + en.w && p.x + pW > en.x && p.y < en.y + en.h && p.y + pH > en.y) {
+            p.hp -= 0.3;
+            document.getElementById("hp-bar").style.width = p.hp + "%";
+            if (p.hp <= 0) location.reload();
+        }
+    });
+
+    depth += 0.1;
+    document.getElementById("score").innerText = score;
+    document.getElementById("depth").innerText = Math.floor(depth);
+    requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
